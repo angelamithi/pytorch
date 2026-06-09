@@ -310,9 +310,11 @@ def download_torchvision_dataset(
     root: str = "data",
     train_transform: Optional[Callable] = None,
     test_transform: Optional[Callable] = None,
-    split_type: str = "standard",
+    split_type="train_test",
     download: bool = True,
 ) -> Tuple[Dataset, Dataset]:
+
+
     """
     Downloads and prepares a torchvision dataset with train/test splits.
 
