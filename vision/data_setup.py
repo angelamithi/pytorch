@@ -1,65 +1,67 @@
-"""
-Contains functionality for creating PyTorch DataLoaders for 
-image classification data.
-"""
-import os
-
-from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+from torchvision import datasets
+import os
+from typing import Optional, Tuple, Any
 
-NUM_WORKERS = os.cpu_count()
 
 def create_dataloaders(
-    train_dir: str, 
-    test_dir: str, 
-    transform: transforms.Compose, 
-    batch_size: int, 
-    num_workers: int=NUM_WORKERS
+    train_data=None,
+    test_data=None,
+    train_dir: str = None,
+    test_dir: str = None,
+    transform=None,
+    batch_size: int = 32,
+    num_workers: int = os.cpu_count()
 ):
-  """Creates training and testing DataLoaders.
+    """
+    Creates DataLoaders from either:
+    1. Pre-built datasets (e.g. Food101)
+    2. Image folders (train_dir/test_dir)
 
-  Takes in a training directory and testing directory path and turns
-  them into PyTorch Datasets and then into PyTorch DataLoaders.
+    Args:
+        train_data: Optional prebuilt training dataset
+        test_data: Optional prebuilt test dataset
+        train_dir: Optional path for ImageFolder training data
+        test_dir: Optional path for ImageFolder test data
+        transform: torchvision transforms (used only if using ImageFolder)
+        batch_size: batch size
+        num_workers: dataloader workers
 
-  Args:
-    train_dir: Path to training directory.
-    test_dir: Path to testing directory.
-    transform: torchvision transforms to perform on training and testing data.
-    batch_size: Number of samples per batch in each of the DataLoaders.
-    num_workers: An integer for number of workers per DataLoader.
+    Returns:
+        train_dataloader, test_dataloader, class_names
+    """
 
-  Returns:
-    A tuple of (train_dataloader, test_dataloader, class_names).
-    Where class_names is a list of the target classes.
-    Example usage:
-      train_dataloader, test_dataloader, class_names = \
-        = create_dataloaders(train_dir=path/to/train_dir,
-                             test_dir=path/to/test_dir,
-                             transform=some_transform,
-                             batch_size=32,
-                             num_workers=4)
-  """
-  # Use ImageFolder to create dataset(s)
-  train_data = datasets.ImageFolder(train_dir, transform=transform)
-  test_data = datasets.ImageFolder(test_dir, transform=transform)
+    # -------------------------------------------------------
+    # CASE 1: If dataset objects are already provided
+    # -------------------------------------------------------
+    if train_data is not None and test_data is not None:
+        class_names = getattr(train_data, "classes", None)
 
-  # Get class names
-  class_names = train_data.classes
+    # -------------------------------------------------------
+    # CASE 2: If using ImageFolder paths
+    # -------------------------------------------------------
+    else:
+        train_data = datasets.ImageFolder(train_dir, transform=transform)
+        test_data = datasets.ImageFolder(test_dir, transform=transform)
+        class_names = train_data.classes
 
-  # Turn images into data loaders
-  train_dataloader = DataLoader(
-      train_data,
-      batch_size=batch_size,
-      shuffle=True,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
-  test_dataloader = DataLoader(
-      test_data,
-      batch_size=batch_size,
-      shuffle=False,
-      num_workers=num_workers,
-      pin_memory=True,
-  )
+    # -------------------------------------------------------
+    # Create DataLoaders
+    # -------------------------------------------------------
+    train_dataloader = DataLoader(
+        train_data,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=True
+    )
 
-  return train_dataloader, test_dataloader, class_names
+    test_dataloader = DataLoader(
+        test_data,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=True
+    )
+
+    return train_dataloader, test_dataloader, class_names
