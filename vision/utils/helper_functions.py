@@ -388,15 +388,15 @@ def download_torchvision_dataset(
     # -------------------------------------------------------
     # Create DataLoaders
     # -------------------------------------------------------
-    train_dataloader = datasets.DataLoader(
-        train_data,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        pin_memory=True
+    train_dataloader = DataLoader(
+    train_data,
+    batch_size=batch_size,
+    shuffle=True,
+    num_workers=num_workers,
+    pin_memory=True
     )
 
-    test_dataloader = datasets.DataLoader(
+    test_dataloader = DataLoader(
         test_data,
         batch_size=batch_size,
         shuffle=False,
