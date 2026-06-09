@@ -533,3 +533,139 @@ def create_gradio_demo(
     )
 
     return demo
+import shutil
+import random
+from pathlib import Path
+from typing import List, Union
+
+
+def create_demo_directory(
+    demo_name: str,
+    model_path: Union[str, Path],
+    image_paths: List[Union[str, Path]],
+    num_examples: int = 3,
+    remove_existing: bool = True,
+    copy_model: bool = True
+):
+    """
+    Creates a deployment/demo directory for an image classification project.
+
+    The function:
+    - Creates a demo directory
+    - Creates an examples directory
+    - Copies random example images
+    - Copies or moves a model file into the demo directory
+
+    Args:
+        demo_name (str):
+            Name of demo folder to create.
+
+        model_path (str | Path):
+            Path to trained model file.
+
+        image_paths (List[str | Path]):
+            List of image paths to sample example images from.
+
+        num_examples (int):
+            Number of example images to include.
+
+        remove_existing (bool):
+            Whether to delete an existing demo directory.
+
+        copy_model (bool):
+            If True, copy model.
+            If False, move model.
+
+    Returns:
+        dict containing:
+            - demo_path
+            - examples_path
+            - example_list
+            - model_destination
+
+    Example:
+        demo_assets = create_demo_directory(
+            demo_name="foodvision_mini",
+            model_path="models/best_model.pth",
+            image_paths=test_data_paths,
+            num_examples=3
+        )
+    """
+
+    # Convert paths
+    model_path = Path(model_path)
+    image_paths = [Path(path) for path in image_paths]
+
+    # Create demo path
+    demo_path = Path("demos") / demo_name
+
+    # Remove existing demo
+    if remove_existing and demo_path.exists():
+        shutil.rmtree(demo_path)
+
+    demo_path.mkdir(parents=True, exist_ok=True)
+
+    # Create examples directory
+    examples_path = demo_path / "examples"
+    examples_path.mkdir(parents=True, exist_ok=True)
+
+    # Select random example images
+    selected_examples = random.sample(
+        image_paths,
+        k=min(num_examples, len(image_paths))
+    )
+
+    # Copy example images
+    for example in selected_examples:
+        destination = examples_path / example.name
+
+        print(f"[INFO] Copying {example} -> {destination}")
+
+        shutil.copy2(
+            src=example,
+            dst=destination
+        )
+
+    # Create Gradio example list
+    example_list = [
+        [f"examples/{example.name}"]
+        for example in selected_examples
+    ]
+
+    # Model destination
+    model_destination = demo_path / model_path.name
+
+    # Copy or move model
+    if model_path.exists():
+
+        if copy_model:
+            shutil.copy2(
+                src=model_path,
+                dst=model_destination
+            )
+
+            print(
+                f"[INFO] Model copied to {model_destination}"
+            )
+
+        else:
+            shutil.move(
+                src=model_path,
+                dst=model_destination
+            )
+
+            print(
+                f"[INFO] Model moved to {model_destination}"
+            )
+
+    else:
+        print(
+            f"[WARNING] Model not found: {model_path}"
+        )
+
+    return {
+        "demo_path": demo_path,
+        "examples_path": examples_path,
+        "example_list": example_list,
+        "model_destination": model_destination
+    }
