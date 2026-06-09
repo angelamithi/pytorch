@@ -22,7 +22,7 @@ import torch
 from PIL import Image
 from timeit import default_timer as timer
 from tqdm.auto import tqdm
-from typing import List, Dict
+from typing import List, Dict,Tuple
 
 # Walk through an image classification directory and find out how many files (images)
 # are in each subdirectory.
