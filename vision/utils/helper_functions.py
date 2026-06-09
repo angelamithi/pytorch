@@ -669,3 +669,137 @@ def create_demo_directory(
         "example_list": example_list,
         "model_destination": model_destination
     }
+import os
+from pathlib import Path
+from typing import List, Union
+
+
+def create_gradio_deployment_files(
+    demo_path: Union[str, Path],
+    class_names: List[str],
+    num_classes: int = 3):
+
+    """
+    Creates a full Gradio deployment folder including:
+    - model.py
+    - app.py
+    - requirements.txt
+    - class_names.txt
+    """
+
+    demo_path = Path(demo_path)
+    demo_path.mkdir(parents=True, exist_ok=True)
+
+    # -------------------------------------------------------
+    # 1. CREATE class_names.txt
+    # -------------------------------------------------------
+    class_file = demo_path / "class_names.txt"
+
+    with open(class_file, "w") as f:
+        for name in class_names:
+            f.write(f"{name}\n")
+
+    print(f"[INFO] Saved class names to {class_file}")
+
+    # -------------------------------------------------------
+    # 2. CREATE model.py
+    # -------------------------------------------------------
+    model_py = f"""
+        import torch
+        import torchvision
+        from torch import nn
+
+
+        def create_model(num_classes={num_classes}, seed=42):
+            weights = torchvision.models.EfficientNet_B2_Weights.DEFAULT
+            transforms = weights.transforms()
+            model = torchvision.models.efficientnet_b2(weights=weights)
+
+            for param in model.parameters():
+                param.requires_grad = False
+
+            torch.manual_seed(seed)
+            model.classifier = nn.Sequential(
+                nn.Dropout(p=0.3, inplace=True),
+                nn.Linear(in_features=1408, out_features=num_classes),
+            )
+
+            return model, transforms
+        """
+
+    (demo_path / "model.py").write_text(model_py)
+
+    # -------------------------------------------------------
+    # 3. CREATE app.py (READS class_names.txt)
+    # -------------------------------------------------------
+    app_py = f"""
+    import gradio as gr
+    import torch
+    from model import create_model
+    from timeit import default_timer as timer
+    from typing import Dict, Tuple
+
+    # Load class names from file
+    with open("class_names.txt", "r") as f:
+        class_names = [line.strip() for line in f.readlines()]
+
+    # Load model
+    model, transforms = create_model(num_classes={num_classes})
+
+    model.load_state_dict(
+        torch.load("model.pth", map_location=torch.device("cpu"))
+    )
+
+
+    def predict(img) -> Tuple[Dict, float]:
+        start_time = timer()
+
+        img = transforms(img).unsqueeze(0)
+
+        model.eval()
+        with torch.inference_mode():
+            pred_probs = torch.softmax(model(img), dim=1)
+
+        pred_dict = {{
+            class_names[i]: float(pred_probs[0][i])
+            for i in range(len(class_names))
+        }}
+
+        pred_time = round(timer() - start_time, 5)
+
+        return pred_dict, pred_time
+
+
+    example_list = [["examples/" + f] for f in os.listdir("examples")]
+
+    demo = gr.Interface(
+        fn=predict,
+        inputs=gr.Image(type="pil"),
+        outputs=[
+            gr.Label(num_top_classes={num_classes}),
+            gr.Number()
+        ],
+        examples=example_list,
+        title="Image Classification Demo",
+        description="Auto-generated Gradio app",
+    )
+
+    demo.launch()
+    """
+
+    (demo_path / "app.py").write_text(app_py)
+
+    # -------------------------------------------------------
+    # 4. CREATE requirements.txt
+    # -------------------------------------------------------
+    requirements_txt = """
+    torch
+    torchvision
+    gradio
+    """
+
+    (demo_path / "requirements.txt").write_text(requirements_txt)
+
+    print(f"[INFO] Deployment files created at: {demo_path}")
+
+    return demo_path
