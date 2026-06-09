@@ -300,6 +300,79 @@ def download_data(source: str,
             os.remove(data_path / target_file)
     
     return image_path
+from pathlib import Path
+from typing import Callable, Tuple, Optional
+from torch.utils.data import Dataset
+
+
+def download_torchvision_dataset(
+    dataset_class,
+    root: str = "data",
+    train_transform: Optional[Callable] = None,
+    test_transform: Optional[Callable] = None,
+    split_type: str = "standard",
+    download: bool = True,
+) -> Tuple[Dataset, Dataset]:
+    """
+    Downloads and prepares a torchvision dataset with train/test splits.
+
+    Args:
+        dataset_class: torchvision dataset class (e.g. datasets.Food101)
+        root (str): Root directory to store data
+        train_transform (Callable): Transform for training data
+        test_transform (Callable): Transform for test data
+        split_type (str): Type of split argument used by dataset
+            (e.g. "train/test" or "standard")
+        download (bool): Whether to download dataset
+
+    Returns:
+        Tuple[train_dataset, test_dataset]
+    """
+
+    data_dir = Path(root)
+
+    # -------------------------------------------------------
+    # Handle Food101-style datasets (train/test split)
+    # -------------------------------------------------------
+    if split_type == "train_test":
+
+        train_data = dataset_class(
+            root=data_dir,
+            split="train",
+            transform=train_transform,
+            download=download
+        )
+
+        test_data = dataset_class(
+            root=data_dir,
+            split="test",
+            transform=test_transform,
+            download=download
+        )
+
+    # -------------------------------------------------------
+    # Handle datasets that use train=True/False (e.g. CIFAR10)
+    # -------------------------------------------------------
+    else:
+
+        train_data = dataset_class(
+            root=data_dir,
+            train=True,
+            transform=train_transform,
+            download=download
+        )
+
+        test_data = dataset_class(
+            root=data_dir,
+            train=False,
+            transform=test_transform,
+            download=download
+        )
+
+    print(f"[INFO] Train samples: {len(train_data)}")
+    print(f"[INFO] Test samples: {len(test_data)}")
+
+    return train_data, test_data
 
 
 # 1. Create a function to return a list of dictionaries with sample, truth label, prediction, prediction probability and prediction time
@@ -809,6 +882,7 @@ from pathlib import Path
 
 
 def zip_and_download_demo(
+    
     demo_path: str,
     zip_name: str = "app.zip",
     exclude_patterns: tuple = (
@@ -860,3 +934,62 @@ def zip_and_download_demo(
             print("[INFO] Not running in Google Colab. Zip created locally.")
 
     return zip_path
+import torch
+from typing import Union, Dict
+from pathlib import Path
+from torch import nn
+
+
+def load_model_state_dict(
+    model: nn.Module,
+    model_path: Union[str, Path],
+    device: str = "cpu",
+    strict: bool = True,
+    map_location: str = "cpu",
+) -> nn.Module:
+    """
+    Loads a saved PyTorch state_dict into a model.
+
+    Args:
+        model (nn.Module): Initialized PyTorch model architecture.
+        model_path (str | Path): Path to .pth or .pt file.
+        device (str): Device to load model to ("cpu" or "cuda").
+        strict (bool): Whether to strictly enforce state_dict matching.
+        map_location (str): Device mapping for torch.load.
+
+    Returns:
+        nn.Module: Model with loaded weights.
+    """
+
+    model_path = Path(model_path)
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"[ERROR] Model file not found: {model_path}")
+
+    # -------------------------------------------------------
+    # Load checkpoint
+    # -------------------------------------------------------
+    checkpoint = torch.load(model_path, map_location=map_location)
+
+    # -------------------------------------------------------
+    # Handle different checkpoint formats
+    # -------------------------------------------------------
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        state_dict = checkpoint["state_dict"]
+    else:
+        state_dict = checkpoint
+
+    # -------------------------------------------------------
+    # Load into model
+    # -------------------------------------------------------
+    model.load_state_dict(state_dict, strict=strict)
+
+    # -------------------------------------------------------
+    # Move model to device + eval mode
+    # -------------------------------------------------------
+    model.to(device)
+    model.eval()
+
+    print(f"[INFO] Model loaded from {model_path} on {device}")
+
+    return model
