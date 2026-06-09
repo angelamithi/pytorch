@@ -398,26 +398,70 @@ def pred_and_store(paths: List[pathlib.Path],
     return pred_list
 
 
-def predict_single_image(img) -> Tuple[Dict, float]:
-    """Transforms and performs a prediction on a single img and returns prediction and time taken.
+from typing import Tuple, Dict, List
+from PIL import Image
+from timeit import default_timer as timer
+import torch
+from torch import nn
+import torchvision
+
+
+def predict_single_image(
+    img: Image.Image,
+    model: nn.Module,
+    transform: torchvision.transforms.Compose,
+    class_names: List[str],
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
+) -> Tuple[Dict[str, float], float]:
     """
-    # Start the timer
+    Transforms and performs a prediction on a single image and returns
+    prediction probabilities and time taken.
+
+    Args:
+        img (PIL.Image.Image): Image to predict on.
+        model (nn.Module): Trained PyTorch model.
+        transform (torchvision.transforms.Compose): Image transformations
+            required by the model.
+        class_names (List[str]): List of class names corresponding to the
+            model's output classes.
+        device (str): Device to run inference on.
+
+    Returns:
+        Tuple[Dict[str, float], float]:
+            - Dictionary mapping class names to probabilities.
+            - Prediction time in seconds.
+
+    Example:
+        pred_dict, pred_time = predict_single_image(
+            img=image,
+            model=vit_model,
+            transform=vit_transforms,
+            class_names=class_names
+        )
+    """
+
+    # Start timer
     start_time = timer()
 
-    # Transform the target image and add a batch dimension
-    img = effnetb2_transforms(img).unsqueeze(0)
+    # Prepare image
+    img = transform(img).unsqueeze(0).to(device)
 
-    # Put model into evaluation mode and turn on inference mode
-    effnetb2.eval()
+    # Prepare model
+    model = model.to(device)
+    model.eval()
+
+    # Inference
     with torch.inference_mode():
-        # Pass the transformed image through the model and turn the prediction logits into prediction probabilities
-        pred_probs = torch.softmax(effnetb2(img), dim=1)
+        pred_logits = model(img)
+        pred_probs = torch.softmax(pred_logits, dim=1)
 
-    # Create a prediction label and prediction probability dictionary for each prediction class (this is the required format for Gradio's output parameter)
-    pred_labels_and_probs = {class_names[i]: float(pred_probs[0][i]) for i in range(len(class_names))}
+    # Convert predictions to dictionary
+    pred_labels_and_probs = {
+        class_names[i]: float(pred_probs[0][i].cpu())
+        for i in range(len(class_names))
+    }
 
-    # Calculate the prediction time
+    # Calculate prediction time
     pred_time = round(timer() - start_time, 5)
 
-    # Return the prediction dictionary and prediction time
     return pred_labels_and_probs, pred_time
