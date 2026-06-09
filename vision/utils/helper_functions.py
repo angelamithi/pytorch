@@ -6,6 +6,7 @@ If a function gets defined once and could be used over and over, it'll go in her
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import inspect
 
 from torch import nn
 
